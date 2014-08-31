@@ -4,6 +4,7 @@
 package D3Profile::Item;
 
 use strict;
+use Storable;
 use JSON;
 use LWP::UserAgent;
 
@@ -22,6 +23,21 @@ sub new {
   }
 
   my $self = decode_json($res->content());
+  return bless $self, $class;
+}
+
+sub load {
+  my ($class, $file) = @_;
+
+  if ( !defined($file) ) {
+    die("Error: must specify file to load from\n");
+  }
+
+  my $self = retrieve($file);
+  if ( ref($self) ne "D3Profile::Item" ) {
+    die("Error: stored object not D3Ranks\n");
+  }
+
   return bless $self, $class;
 }
 
@@ -237,6 +253,19 @@ sub life {
 
   my $sum = $self->attribute("Hitpoints_Max_Percent_Bonus_Item");
   return $sum;
+}
+
+# Save item to file
+sub save {
+  my ($self, $filename) = @_;
+
+  if ( !defined($filename) ) {
+    die("Error: no filename specified\n");
+  }
+
+  if ( !store($self, $filename) ) {
+    die("Error storing to disk\n");
+  }
 }
 
 # Print this item

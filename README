@@ -6,4 +6,6 @@ Modules provided are:
   D3Profile : Profile information based on BattleTag
   D3Ranks   : D3 Greater Rift and Season Rankings
 
-Please review examples in the examples directory
+Please review examples in the examples directory.  Most features
+are undocumented at this point, however $object->save("filename")
+should be functional on all modules;

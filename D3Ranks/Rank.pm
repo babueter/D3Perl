@@ -71,7 +71,7 @@ sub print {
   my $self = shift;
   binmode(STDOUT, ":utf8");
 
-  printf "%5d | %20s | %3d | %13s | %19s\n",
+  printf "%5d | %20s | %3d  | %13s | %19s\n",
 	$self->number(),
 	$self->battleTag(),
 	$self->tier(),

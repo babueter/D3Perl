@@ -1,4 +1,7 @@
 #!/usr/bin/perl
+#
+# Simple example to display greater rift ranks
+#
 
 use strict;
 use D3Ranks;
@@ -34,7 +37,11 @@ my $count = shift @ARGV;
 $count = 10 if !defined($count);
 
 my $rankings = new D3Ranks($rankClass, { count => $count });
+print "--------------------------------------------------------------------------\n";
+print " ". $rankings->name() ."\n";
+print "------+----------------------+------+---------------+---------------------\n";
 print " rank |           battle tag | tier |    clear time | Date\n";
+print "------+----------------------+------+---------------+---------------------\n";
 foreach my $rank ($rankings->rows()) {
   $rank->print();
 }

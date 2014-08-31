@@ -9,3 +9,13 @@ Modules provided are:
 Please review examples in the examples directory.  Most features
 are undocumented at this point, however $object->save("filename")
 should be functional on all modules;
+
+NOTE: You may need to install these modules in order to use these scripts
+
+  JSON
+  LWP::UserAgent
+  HTML::TableContentParser
+  HTML::Strip
+  Date::Parse
+
+

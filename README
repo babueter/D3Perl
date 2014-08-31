@@ -1,0 +1,9 @@
+These perl packages provide an OO interface to fetching and viewing
+D3 Battle.net profiles and hero data.
+
+Modules provided are:
+
+  D3Profile : Profile information based on BattleTag
+  D3Ranks   : D3 Greater Rift and Season Rankings
+
+Please review examples in the examples directory

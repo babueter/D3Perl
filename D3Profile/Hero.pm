@@ -167,6 +167,30 @@ sub print {
   foreach my $skill ( @{$self->{skills}->{passive}} ) {
     print "      ". $skill->{skill}->{name} ."\n";
   }
+
+  print "\n";
+  print "Items:\n";
+
+  if ( $self->item("mainHand") ) {
+    printf "%15s | %s (%s)\n", "mainHand", $self->item("mainHand")->{name}, $self->item("mainHand")->{typeName}
+  } else {
+    printf "%15s | empty\n", "mainHand";
+  }
+  if ( $self->item("offHand") ) {
+    printf "%15s | %s (%s)\n", "offHand", $self->item("offHand")->{name}, $self->item("offHand")->{typeName}
+  } else {
+    printf "%15s | empty\n", "offHand";
+  }
+
+  foreach my $slot (sort $self->slots()) {
+    next if $slot eq "mainHand";
+    next if $slot eq "offHand";
+    if ( $self->item($slot) ) {
+      printf "%15s | %s (%s)\n", $slot, $self->item($slot)->{name}, $self->item($slot)->{typeName};
+    } else {
+      printf "%15s | empty\n", $slot;
+    }
+  }
 }
 
 sub save {

@@ -317,7 +317,7 @@ sub updateMissingHeroes {
    # Update any missing hero data
     if ( !$rank->hero() ) {
       my $profile = load D3Profile("$profile_cache_dir/". $rank->battleTag());
-      $rank->hero( findHero($rankClass, $profile) );
+      $rank->hero( findHero($profile, $rankClass) );
     }
   }
 }

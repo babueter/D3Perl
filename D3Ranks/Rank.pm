@@ -19,6 +19,7 @@ sub new {
     "_tier" => $data[2],
     "_clearTime" => $data[3],
     "_date" => $data[4],
+    "_hero" => undef,
   };
 
   $self->{_battleTag} =~ s/ Profile .*$//;
@@ -65,6 +66,15 @@ sub clearTime {
 sub date {
   my $self = shift;
   return $self->{_date};
+}
+
+sub hero {
+  my ($self, $hero) = @_;
+
+  if (defined($hero)) {
+    $self->{_hero} = $hero;
+  }
+  return $self->{_hero};
 }
 
 sub print {

@@ -60,13 +60,13 @@ my %RANKINGS = (
 my %CLASSNAMES = (
   "rift-barbarian" => "barbarian",
   "rift-crusader" => "crusader",
-  "rift-dh" => "deamon-hunter",
+  "rift-dh" => "demon-hunter",
   "rift-monk" => "monk",
   "rift-wd" => "witch-doctor",
   "rift-wizard" => "wizard",
   "rift-hardcore-barbarian" => "barbarian",
   "rift-hardcore-crusader" => "crusader",
-  "rift-hardcore-dh" => "deamon-hunter",
+  "rift-hardcore-dh" => "demon-hunter",
   "rift-hardcore-monk" => "monk",
   "rift-hardcore-wd" => "witch-doctor",
   "rift-hardcore-wizard" => "wizard",
@@ -74,18 +74,18 @@ my %CLASSNAMES = (
 
 # Boolean hardcore values
 my %HARDCORE = (
-  "rift-barbarian" => 0,
-  "rift-crusader" => 0,
-  "rift-dh" => 0,
-  "rift-monk" => 0,
-  "rift-wd" => 0,
-  "rift-wizard" => 0,
-  "rift-hardcore-barbarian" => 1,
-  "rift-hardcore-crusader" => 1,
-  "rift-hardcore-dh" => 1,
-  "rift-hardcore-monk" => 1,
-  "rift-hardcore-wd" => 1,
-  "rift-hardcore-wizard" => 1,
+  "rift-barbarian" => "false",
+  "rift-crusader" => "false",
+  "rift-dh" => "false",
+  "rift-monk" => "false",
+  "rift-wd" => "false",
+  "rift-wizard" => "false",
+  "rift-hardcore-barbarian" => "true",
+  "rift-hardcore-crusader" => "true",
+  "rift-hardcore-dh" => "true",
+  "rift-hardcore-monk" => "true",
+  "rift-hardcore-wd" => "true",
+  "rift-hardcore-wizard" => "true",
 );
 
 GetOptions(%options) or die ("Error in command line arguments\n");
@@ -115,25 +115,36 @@ foreach my $rankClass (keys %RANKINGS) {
 foreach my $rankClass (keys %RANKINGS) {
   my $rankings = $RANKINGS{$rankClass};
 
-  print "Loading $rankClass profiles..." unless $quiet;
   foreach my $rank ($rankings->rows()) {
     my $btag = $rank->battleTag();
+    my $hero = $rank->hero();
 
-    if ( !$no_download && (!stat("$profile_cache_dir/$btag") || (stat("$profile_cache_dir/$btag"))[9] < $rank->date() )) {
-      print "Fetching $btag data ($rankClass)..." unless $quiet;
-      my $profile = new D3Profile($btag);
-      $profile->loadData();
-      $profile->save("$profile_cache_dir/$btag");
-      print "done\n" unless $quiet;
-
-    } else {
-      if ( stat("$profile_cache_dir/$btag") ) {
-        my $profile = load D3Profile("$profile_cache_dir/$btag");
-        updateStats($profile, $rankClass);
+   # Find the hero within the profile
+    if ( !$hero ) {
+      my $profile = undef;
+      if ( !$no_download && (!stat("$profile_cache_dir/$btag") || (stat("$profile_cache_dir/$btag"))[9] < $rank->date() )) {
+        print "Fetching $btag data ($rankClass)..." unless $quiet;
+          $profile = new D3Profile($btag);
+          $profile->loadData();
+          $profile->save("$profile_cache_dir/$btag");
+        print "done\n" unless $quiet;
+  
+      } else {
+        if ( stat("$profile_cache_dir/$btag") ) {
+          $profile = load D3Profile("$profile_cache_dir/$btag");
+        }
       }
+      $hero = findHero($profile, $rankClass);
+      $rank->hero($hero);
     }
+    updateStats($hero, $rankClass);
   }
-  print "done\n" unless $quiet;
+
+ # Save any updated hero values
+  if ( !$no_download ) {
+    updateMissingHeroes($rankClass);
+    $RANKINGS{$rankClass}->save("$rank_cache_dir/$rankClass");
+  }
   writeClassStats($rankClass);
 }
 
@@ -206,10 +217,9 @@ sub writeClassStats {
   print FOUT $rankings->name() ."\n";
   print FOUT "\n";
   print FOUT "---------------------------+----------------------+-------\n";
-  print FOUT "           skill           |         rune         | count\n";
+  print FOUT " skill                     | rune                 | count\n";
   print FOUT "---------------------------+----------------------+-------\n";
   foreach (sort {$ACTIVE_SKILLS{$rankClass}->{$b} <=> $ACTIVE_SKILLS{$rankClass}->{$a}} keys %{$ACTIVE_SKILLS{$rankClass}}) {
-    next if $ACTIVE_SKILLS{$rankClass}->{$_} < 5;
     next if $_ eq "";
     next if $_ eq ":";
 
@@ -219,10 +229,9 @@ sub writeClassStats {
   print FOUT "\n";
 
   print FOUT "---------------------------+-------\n";
-  print FOUT "          passive          | count\n";
+  print FOUT " passive                   | count\n";
   print FOUT "---------------------------+-------\n";
   foreach (sort {$PASSIVE_SKILLS{$rankClass}->{$b} <=> $PASSIVE_SKILLS{$rankClass}->{$a}} keys %{$PASSIVE_SKILLS{$rankClass}}) {
-    next if $PASSIVE_SKILLS{$rankClass}->{$_} < 5;
     next if $_ eq "";
 
     printf FOUT " %s | %4d\n", substr($_." "x25, 0, 25), $PASSIVE_SKILLS{$rankClass}->{$_};
@@ -230,10 +239,9 @@ sub writeClassStats {
   print FOUT "\n";
 
   print FOUT "---------------------------+----------------------+-------\n";
-  print FOUT "         mainhand          |       offhand        | count\n";
+  print FOUT " mainhand                  | offhand              | count\n";
   print FOUT "---------------------------+----------------------+-------\n";
   foreach (sort {$WEAPON_COMBO{$rankClass}->{$b} <=> $WEAPON_COMBO{$rankClass}->{$a}} keys %{$WEAPON_COMBO{$rankClass}}) {
-    next if $WEAPON_COMBO{$rankClass}->{$_} < 5;
     next if $_ eq "";
     next if $_ eq ":";
 
@@ -245,32 +253,38 @@ sub writeClassStats {
   print "done\n" unless $quiet;
 }
 
-# Parse profile data and add to rankClass stats
-sub updateStats {
+sub findHero {
   my ($profile, $rankClass) = @_;
 
- # Look through list if heroes sorted by last time of update
   my $hero = undef;
   foreach (sort {$profile->hero($b)->{"last-updated"} cmp $profile->hero($a)->{"last-updated"}} $profile->hero()) {
     $hero = $profile->hero($_);
-
+  
     # Pick the first hero of the right class unless:
     #    - any blank skills activated
     #    - hardcore/softcore doesnt match
     #    - is not level 70
      if ( $hero->{class} eq $CLASSNAMES{$rankClass} ) {
-       next if $hero->skillActivated("");
-       next if $hero->{hardcore} != $HARDCORE{$rankClass};
-       next if $hero->{level} ne "70";
+       next if ($hero->skillActivated(""));
+       next if ($hero->{hardcore} != $HARDCORE{$rankClass});
+       next if ($hero->{level} ne "70");
+  
        last;
     }
   }
+  
+  return undef if ($hero->{class} ne $CLASSNAMES{$rankClass});
+  return undef if ($hero->skillActivated(""));
+  return undef if ($hero->{hardcore} != $HARDCORE{$rankClass});
+  return undef if ($hero->{level} ne "70");
+  
+  return $hero;
+}
 
- # Recheck class, hero, harcore, and level in case no heroes matched
-  return if $hero->{class} ne $CLASSNAMES{$rankClass};
-  return if $hero->skillActivated("");
-  return if $hero->{hardcore} != $HARDCORE{$rankClass};
-  return if $hero->{level} ne "70";
+# Parse profile data and add to rankClass stats
+sub updateStats {
+  my ($hero, $rankClass) = @_;
+  return if !defined($hero);
 
  # Update active/passive skills used
   foreach my $skill ($hero->activeSkills()) {
@@ -281,7 +295,7 @@ sub updateStats {
   }
 
  # If there is a mainhand, add that to the list
-  next if !defined($hero->item("mainHand"));
+  return if !defined($hero->item("mainHand"));
   $MAINHAND_WEAPON{$rankClass}->{ $hero->item("mainHand")->{name} }++;
 
  # If there is an offhand item equiped, add that to stats and update weaponCombo
@@ -295,4 +309,16 @@ sub updateStats {
   $WEAPON_COMBO{$rankClass}->{$weaponCombo}++;
 }
 
+# Find missing heroes within the cache and update the rankings
+sub updateMissingHeroes {
+  my $rankClass = shift;
+
+  foreach my $rank ($RANKINGS{$rankClass}->rows()) {
+   # Update any missing hero data
+    if ( !$rank->hero() ) {
+      my $profile = load D3Profile("$profile_cache_dir/". $rank->battleTag());
+      $rank->hero( findHero($rankClass, $profile) );
+    }
+  }
+}
 

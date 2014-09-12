@@ -89,6 +89,11 @@ sub _populateRows {
 
     my @recordData = ();
     for my $col (@{$row->{cells}}) {
+      if ( $col->{data} =~ m/\/d3\/en\/profile\/(.+\-[0-9]+)/ ) {
+        my $battleTag = $1;
+        push(@recordData, $battleTag);
+        next;
+      }
       my $data = $hs->parse($col->{data});
 
       $data =~ s///g;

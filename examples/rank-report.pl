@@ -19,13 +19,10 @@ my $rankCount = 10;
 my $no_download = 0;
 my $quiet = 0;
 
-my $custom_slot = undef;
-
 my %options = (
   "q|quiet" => \$quiet,
   "c|count=i" => \$rankCount,
   "e|era=i" => \$era,
-  "s|slot=s" => \$custom_slot,
   "no-download" => \$no_download,
   "reports-dir=s" => \$report_dir,
   "rank-cache-dir=s" => \$rank_cache_dir,
@@ -36,6 +33,21 @@ my %options = (
 my %PROFILES = ();
 my %ACTIVE_SKILLS = ();
 my %PASSIVE_SKILLS = ();
+
+my %SLOT = ();
+my @SLOTS = (
+  "feet",
+  "legs",
+  "waist",
+  "torso",
+  "hands",
+  "bracers",
+  "shoulders",
+  "head",
+  "neck",
+  "rightFinger",
+  "leftFinger"
+);
 
 my %MAINHAND_WEAPON = ();
 my %OFFHAND_WEAPON = ();
@@ -53,6 +65,7 @@ my %RANKINGS = (
   "rift-monk" => undef,
   "rift-wd" => undef,
   "rift-wizard" => undef,
+  "rift-wizard" => "wizard",
   "rift-hardcore-barbarian" => "barbarian",
   "rift-hardcore-crusader" => "crusader",
   "rift-hardcore-dh" => "demon-hunter",
@@ -115,6 +128,10 @@ foreach my $rankClass (keys %RANKINGS) {
   $OFFHAND_WEAPON{$rankClass} = { };
   $WEAPON_COMBO{$rankClass} = { };
   $CUSTOM_SLOT{$rankClass} = { };
+
+  $SLOT{$rankClass} = { };
+  foreach (@SLOTS) { $SLOT{$rankClass}->{$_} = { }; };
+  $SLOT{$rankClass}->{"finger"} = { };
 }
 
 # Determine if we need to download profile data or use existing cache
@@ -155,7 +172,6 @@ foreach my $rankClass (keys %RANKINGS) {
     $RANKINGS{$rankClass}->save("$rank_cache_dir/$rankClass");
   }
   writeClassStats($rankClass);
-  slotReport($rankClass, $custom_slot);
 }
 
 # Final repott generation
@@ -171,9 +187,6 @@ sub usage {
   print "  -c|--count=#     Return top # of rank profiles. Default is: $rankCount\n";
   print "\n";
   print "  --no-download    Use existing cache data to generate reports.\n";
-  print "\n";
-  print "  -s|--slot=slot   Also gather counts for specified slot.  Example slots:\n";
-  print "                   feet, legs, waist, torso, hands, bracers, shoulders, head, neck\n";
   print "\n";
   print "  --reports-dir=<dir>       Location to store report text files.  Default is: $report_dir\n";
   print "  --rank-cache-dir=<dir>    Location to store ranking cache data.  Default is: $rank_cache_dir\n";
@@ -261,7 +274,25 @@ sub writeClassStats {
     my ($mainHand, $offHand) = split(":", $_);
     printf FOUT " %s | %s | %4d\n", substr($mainHand." "x25, 0, 25), substr($offHand." "x20, 0, 20), $WEAPON_COMBO{$rankClass}->{$_};
   }
-  
+  print FOUT "\n";
+
+  foreach my $slot (@SLOTS) {
+    next if $slot eq "rightFinger";
+    $slot = "finger" if $slot eq "leftFinger";
+
+    print  FOUT "---------------------------+--------\n";
+    printf FOUT " %s | count\n", substr($slot." "x25, 0, 25);
+    print  FOUT "---------------------------+--------\n";
+
+    foreach (sort {$SLOT{$rankClass}->{$slot}->{$b} <=> $SLOT{$rankClass}->{$slot}->{$a}} keys %{ $SLOT{$rankClass}->{$slot} }) {
+      next if $_ eq "";
+
+      printf FOUT " %s | %4d\n", substr($_." "x25, 0, 25), $SLOT{$rankClass}->{$slot}->{$_};
+    }
+    print FOUT "\n";
+
+  }
+
   close(FOUT);
   print "done\n" unless $quiet;
 }
@@ -336,11 +367,16 @@ sub updateStats {
   }
   $WEAPON_COMBO{$rankClass}->{$weaponCombo}++;
 
-  if ( $custom_slot ) {
-    if ( $hero->item($custom_slot) ) {
-      $CUSTOM_SLOT{$rankClass}->{ $hero->item($custom_slot)->{name} }++;
+ # Update values by slot name
+  foreach my $slot (@SLOTS) {
+    if ( defined($hero->item($slot)) ) {
+      if ( $slot eq "leftFinger" || $slot eq "rightFinger" ) {
+        $SLOT{$rankClass}->{"finger"}->{ $hero->item($slot)->{name} }++
+      } else {
+        $SLOT{$rankClass}->{$slot}->{ $hero->item($slot)->{name} }++
+      }
     }
-  }
+  } 
 }
 
 # Find missing heroes within the cache and update the rankings

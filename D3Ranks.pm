@@ -51,8 +51,14 @@ sub new {
   }
 
  # Fetch the source HTML from URL
+  my $tries = 3;
   my $ua = LWP::UserAgent->new();
-  my $res = $ua->get("http://us.battle.net/d3/en/rankings/era/".$self->{era}."/".$self->{_type});
+  my $res;
+
+  eval { $res = $ua->get("http://us.battle.net/d3/en/rankings/era/".$self->{era}."/".$self->{_type}); };
+  while ( !$res->is_success && $tries-- ) {
+    eval { $res = $ua->request("http://us.battle.net/d3/en/rankings/era/".$self->{era}."/".$self->{_type}); };
+  }
   if ( !$res->is_success) {
     die "Error: ". $res->status_line ."\n";
   }

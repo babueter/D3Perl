@@ -16,8 +16,14 @@ sub new {
     die "Error: must supply item ID\n";
   }
 
+  my $tries = 3;
   my $ua = LWP::UserAgent->new();
-  my $res = $ua->request( HTTP::Request->new(GET => "http://us.battle.net/api/d3/data/$itemid") );
+  my $res;
+
+  eval { $res = $ua->request( HTTP::Request->new(GET => "http://us.battle.net/api/d3/data/$itemid") ); };
+  while ( !$res->is_success && $tries-- ) {
+    eval { $res = $ua->request( HTTP::Request->new(GET => "http://us.battle.net/api/d3/data/$itemid") ); };
+  }
   if ( !$res->is_success) {
     die $res->status_line, "\n";
   }

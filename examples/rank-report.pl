@@ -19,10 +19,13 @@ my $rankCount = 10;
 my $no_download = 0;
 my $quiet = 0;
 
+my $custom_slot = undef;
+
 my %options = (
   "q|quiet" => \$quiet,
   "c|count=i" => \$rankCount,
   "e|era=i" => \$era,
+  "s|slot=s" => \$custom_slot,
   "no-download" => \$no_download,
   "reports-dir=s" => \$report_dir,
   "rank-cache-dir=s" => \$rank_cache_dir,
@@ -38,6 +41,8 @@ my %MAINHAND_WEAPON = ();
 my %OFFHAND_WEAPON = ();
 my %WEAPON_COMBO = ();
 
+my %CUSTOM_SLOT = ();
+
 $| = 1;
 
 # Store all the D3Ranks objects, also master list of rankClass
@@ -48,12 +53,12 @@ my %RANKINGS = (
   "rift-monk" => undef,
   "rift-wd" => undef,
   "rift-wizard" => undef,
-  "rift-hardcore-barbarian" => undef,
-  "rift-hardcore-crusader" => undef,
-  "rift-hardcore-dh" => undef,
-  "rift-hardcore-monk" => undef,
-  "rift-hardcore-wd" => undef,
-  "rift-hardcore-wizard" => undef,
+  "rift-hardcore-barbarian" => "barbarian",
+  "rift-hardcore-crusader" => "crusader",
+  "rift-hardcore-dh" => "demon-hunter",
+  "rift-hardcore-monk" => "monk",
+  "rift-hardcore-wd" => "witch-doctor",
+  "rift-hardcore-wizard" => "wizard",
 );
 
 # Actuall class name for each rankClass
@@ -109,6 +114,7 @@ foreach my $rankClass (keys %RANKINGS) {
   $MAINHAND_WEAPON{$rankClass} = { };
   $OFFHAND_WEAPON{$rankClass} = { };
   $WEAPON_COMBO{$rankClass} = { };
+  $CUSTOM_SLOT{$rankClass} = { };
 }
 
 # Determine if we need to download profile data or use existing cache
@@ -124,7 +130,10 @@ foreach my $rankClass (keys %RANKINGS) {
       my $profile = undef;
       if ( !$no_download && (!stat("$profile_cache_dir/$btag") || (stat("$profile_cache_dir/$btag"))[9] < $rank->date() )) {
         print "Fetching $btag data ($rankClass)..." unless $quiet;
-          $profile = new D3Profile($btag);
+          my $tries = 3;
+          while ( $tries-- ) {
+            eval { $profile = new D3Profile($btag); };
+          }
           $profile->loadData();
           $profile->save("$profile_cache_dir/$btag");
         print "done\n" unless $quiet;
@@ -146,6 +155,7 @@ foreach my $rankClass (keys %RANKINGS) {
     $RANKINGS{$rankClass}->save("$rank_cache_dir/$rankClass");
   }
   writeClassStats($rankClass);
+  slotReport($rankClass, $custom_slot);
 }
 
 # Final repott generation
@@ -161,6 +171,9 @@ sub usage {
   print "  -c|--count=#     Return top # of rank profiles. Default is: $rankCount\n";
   print "\n";
   print "  --no-download    Use existing cache data to generate reports.\n";
+  print "\n";
+  print "  -s|--slot=slot   Also gather counts for specified slot.  Example slots:\n";
+  print "                   feet, legs, waist, torso, hands, bracers, shoulders, head, neck\n";
   print "\n";
   print "  --reports-dir=<dir>       Location to store report text files.  Default is: $report_dir\n";
   print "  --rank-cache-dir=<dir>    Location to store ranking cache data.  Default is: $rank_cache_dir\n";
@@ -253,6 +266,21 @@ sub writeClassStats {
   print "done\n" unless $quiet;
 }
 
+sub slotReport {
+  my ($rankClass, $slot) = @_;
+  return if ! $slot ;
+
+  print  "---------------------------+--------\n";
+  printf " %s | count\n", substr($slot." "x25, 0, 25);
+  print  "---------------------------+--------\n";
+
+  foreach (sort {$CUSTOM_SLOT{$rankClass}->{$b} <=> $CUSTOM_SLOT{$rankClass}->{$a}} keys %{$CUSTOM_SLOT{$rankClass}}) {
+    next if $_ eq "";
+
+    printf (" %s | %4d\n", substr($_." "x25, 0, 25), $CUSTOM_SLOT{$rankClass}->{$_});
+  }
+}
+
 sub findHero {
   my ($profile, $rankClass) = @_;
 
@@ -307,6 +335,12 @@ sub updateStats {
     }
   }
   $WEAPON_COMBO{$rankClass}->{$weaponCombo}++;
+
+  if ( $custom_slot ) {
+    if ( $hero->item($custom_slot) ) {
+      $CUSTOM_SLOT{$rankClass}->{ $hero->item($custom_slot)->{name} }++;
+    }
+  }
 }
 
 # Find missing heroes within the cache and update the rankings
